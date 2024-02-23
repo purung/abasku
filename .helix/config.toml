@@ -1,0 +1,7 @@
+[keys.normal]
+A-i = ":format"
+
+[keys.normal."space"]
+b = ":bc"
+E = [":theme everforest_dark", ":lang html"]
+e = [":theme catppuccin_mocha", ":lang rust"]

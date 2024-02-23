@@ -1,0 +1,47 @@
+[package]
+name = "servis"
+version = "0.1.0"
+edition = "2021"
+authors = ["Oliver Nordh <oliver.nordh@proton.me>"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+leptos = { version = "0.6", features = ["csr", "nightly", "rustls"] }
+leptos_meta = { version = "0.6", features = ["csr", "nightly"] }
+leptos_router = { version = "0.6", features = ["csr", "nightly"] }
+console_log = "1"
+log = "0.4"
+console_error_panic_hook = "0.1.7"
+# google_maps = { version = "3.4.1", optional = true }
+google_maps = { version = "3.4.1", optional = true, default_features = false, features = ["tokio", "distance_matrix", "enable-reqwest", "rustls", "brotli"] }
+tokio = { version = "1.35.1", features = ["full"], optional = true }
+serde_json = "1.0.113"
+serde = { version = "1.0.196", features = ["derive"] }
+indicatif = { version = "0.17.7", optional = true }
+once_cell = "1.19.0"
+chrono = { version = "0.4.34", features = ["serde"] }
+uuid = { version = "1.7.0", features = ["js", "serde", "v4"] }
+leptos-use = { version = "0.10.2", features = ["serde"] }
+leptos_icons = "0.3.0"
+icondata = "0.3.0"
+
+# utils
+# strum = { version = "0.25", features = ["derive", "strum_macros"] }
+# strum_macros = "0.25"
+
+
+[dev-dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-test = "0.3"
+web-sys = { version = "0.3", features = ["Document", "Window"] }
+
+
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[features]
+prepare = ["dep:google_maps", "dep:tokio", "dep:indicatif"]

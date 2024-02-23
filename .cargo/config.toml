@@ -1,0 +1,8 @@
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=/nix/store/jfvy2amv3ppagvl80g0x3r82k56016kl-mold-2.4.0/bin/mold"]
+
+# [unstable]
+# codegen-backend = true
+# [profile.server-dev]
+# codegen-backend = "cranelift"

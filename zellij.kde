@@ -1,0 +1,35 @@
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zellij:tab-bar"
+        }
+        children
+        pane size=2 borderless=true {
+            plugin location="zellij:status-bar"
+        }
+    }
+    pane_template name="de" {
+        command "direnv"
+    }
+    tab name="GONGGG" { 
+        pane split_direction="horizontal" {
+            de {
+                args "exec" "." "hx" "."
+            }
+            pane size=8 
+        }
+    }
+    tab name="STATUS" {
+        pane split_direction="horizontal" {
+            de {
+                args "exec" "." "trunk" "serve" "--port" "3000"
+            }
+            de {
+                args "exec" "." "bacon"
+            } 
+            de {
+                args "exec" "." "tailwindcss" "-i" "input.css" "-o" "style/output.css" "-w"
+            } 
+        }
+    }
+}

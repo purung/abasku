@@ -1,0 +1,12 @@
+[[language]]
+name = "rust"
+auto-format = false
+language-servers = ["rust-analyzer", "tailwindcss-ls"]
+
+[language-server.rust-analyzer.config]
+cargo = { features = "all" }
+procMacro = { ignored = {  leptos_macro = ["server"] } }
+rustfmt = {  overrideCommand = ["leptosfmt", "--stdin", "--rustfmt"]  } 
+  
+[language-server.tailwindcss-ls]
+config = { userLanguages = { rust = "html", "*.rs" = "html" } }
