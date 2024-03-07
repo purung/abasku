@@ -9,31 +9,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use web_sys::{MouseEvent, SubmitEvent};
 
-use crate::{components::InputWrap, Trip, Trips};
+use crate::{components::InputWrap, Meals, Trip, Trips};
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
-struct Meals {
-    points: BTreeSet<NaiveDate>,
-}
-
-impl Meals {
-    fn add(&mut self, new: NaiveDate) {
-        self.points.insert(new);
-    }
-    fn remove(&mut self, point: NaiveDate) {
-        self.points.remove(&point);
-    }
-    fn has(&self, date: NaiveDate) -> bool {
-        self.points.contains(&date)
-    }
-    fn toggle(&mut self, date: NaiveDate) {
-        if self.has(date) {
-            self.remove(date)
-        } else {
-            self.add(date)
-        }
-    }
-}
 #[component]
 pub fn Calendar() -> impl IntoView {
     view! {
@@ -94,7 +71,7 @@ pub fn Overview() -> impl IntoView {
             .collect_view()
     };
     view! {
-        <div class="w-full max-w-xl flex flex-col gap-3">
+        <div class="w-full max-w-xl flex gap-3 justify-center">
             <CalendarView forward=move |_| forward() backward=move |_| backward() current=r_current>
                 {cells}
             </CalendarView>
@@ -151,8 +128,8 @@ where
 {
     let current_display = Signal::derive(move || current().format("%b %Y").to_string());
     view! {
-        <div class="max-w-96">
-            <div class="lx yz avk axu text-center items-center flex justify-between">
+        <div class="max-w-96 w-full aspect-square">
+            <div class="text-center items-center flex justify-between">
                 <button
                     type="button"
                     on:click=backward

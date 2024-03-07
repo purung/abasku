@@ -18,8 +18,8 @@ async fn main() {
     let destinations = content.split("\n").into_iter().collect::<Vec<&str>>();
     println!("{destinations:?}");
 
-    let mut google_maps_client = GoogleMapsClient::new(env!("GMAPS_TOKEN"));
-    google_maps_client.with_rate(Api::All, 1, std::time::Duration::new(4, 0));
+    let mut google_maps_client = GoogleMapsClient::try_new(env!("GMAPS_TOKEN")).unwrap();
+    google_maps_client.with_rate(&Api::All, 1, std::time::Duration::new(4, 0));
 
     // Example request:
     let mut keys = HashMap::new();

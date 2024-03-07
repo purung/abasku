@@ -1,6 +1,6 @@
 #![feature(iter_map_windows)]
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use chrono::NaiveDate;
 use leptos::*;
@@ -14,10 +14,10 @@ mod components;
 mod destinations;
 mod pages;
 
-use crate::pages::checkpoint::{AddCheckpoint, CheckpointSummary, Checkpoints};
+use crate::pages::checkpoint::{AddCheckpoint, CheckpointSummary, Checkpoints, Report};
 // Top-Level pages
-use crate::pages::home::Home;
 use crate::pages::food;
+use crate::pages::home::Home;
 use crate::pages::not_found::NotFound;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
@@ -30,9 +30,8 @@ impl Trips {
         self.trips.push(trip);
         self.trips.sort_by_cached_key(|k| k.date);
     }
-    fn remove(mut self, uuid: Uuid) -> Self {
-        self.trips = self.trips.into_iter().filter(|x| x.uuid != uuid).collect();
-        self
+    fn remove(&mut self, uuid: &Uuid) {
+        self.trips.retain(|x| x.uuid != *uuid);
     }
     fn favorites(&self) -> Vec<Trip> {
         let mut counts = HashMap::new();
@@ -79,6 +78,57 @@ impl Trip {
     fn distance_for_human(&self) -> String {
         format!("{} km", self.calculate_distance()).replace(".", ",")
     }
+    fn from_to(&self) -> String {
+        format!(
+            "{}-{}{}",
+            self.from,
+            self.to,
+            if self.returning { " ToR" } else { "" }
+        )
+    }
+    fn report_row(&self, longest_trip: usize, longest_distance: usize) -> String {
+        let Self {
+            date,
+            reason,
+            
+            ..
+        } = &self;
+        let points = self.from_to();
+        let date = date.format("%d/%m").to_string();
+        let distance = self.distance_for_human();
+        let p_1 = ".".repeat(3 + longest_trip - points.chars().count());
+        let p_2 = ".".repeat(3 + longest_distance - distance.chars().count());
+        format!("{date}: {points}{p_1}{distance}{p_2}{reason}")
+    }
+}
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+struct Meals {
+    points: BTreeSet<NaiveDate>,
+}
+
+impl Meals {
+    fn add(&mut self, new: NaiveDate) {
+        self.points.insert(new);
+    }
+    fn remove(&mut self, point: NaiveDate) {
+        self.points.remove(&point);
+    }
+    fn has(&self, date: NaiveDate) -> bool {
+        self.points.contains(&date)
+    }
+    fn toggle(&mut self, date: NaiveDate) {
+        if self.has(date) {
+            self.remove(date)
+        } else {
+            self.add(date)
+        }
+    }
+    fn in_period(&self, after: &NaiveDate, before_inclusive: &NaiveDate) -> usize {
+        self.points
+            .iter()
+            .filter(|f| *f > after && *f <= before_inclusive)
+            .count()
+    }
 }
 
 /// An app router which renders the homepage and handles 404's
@@ -91,46 +141,27 @@ pub fn App() -> impl IntoView {
         <Html lang="sv" dir="ltr" attr:data-theme="light"/>
 
         // sets the document title
-        <Title text="Welcome to Leptos CSR"/>
+        <Title text="Förbättrad självservice"/>
 
         // injects metadata in the <head> of the page
         <Meta charset="UTF-8"/>
         <Meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
-        <ErrorBoundary fallback=|errors| {
-            view! {
-                <h1 class="">"Uh oh! Something went wrong!"</h1>
-
-                <p>"Errors: "</p>
-                // Render a list of errors as strings - good for development purposes
-                <ul>
-                    {move || {
-                        errors
-                            .get()
-                            .into_iter()
-                            .map(|(_, e)| view! { <li>{e.to_string()}</li> })
-                            .collect_view()
-                    }}
-
-                </ul>
-            }
-        }>
-            <Router>
-                <Nav/>
-                <Routes>
-                    <Route path="/" view=Home/>
-                    <Route path="/checkpoint" view=Checkpoints>
-                        <Route path="" view=CheckpointSummary/>
-                        <Route path="ny" view=AddCheckpoint/>
-                    </Route>
-                    <Route path="/mat" view=food::Calendar>
-                        <Route path="" view=food::Overview />
-                    </Route>
-                    <Route path="/*" view=NotFound/>
-                </Routes>
-            </Router>
-
-        </ErrorBoundary>
+        <Router>
+            <Nav/>
+            <Routes>
+                <Route path="/" view=Home/>
+                <Route path="/checkpoint" view=Checkpoints>
+                    <Route path="" view=CheckpointSummary/>
+                    <Route path="ny" view=AddCheckpoint/>
+                    <Route path="report/:checkpoint" view=Report/>
+                </Route>
+                <Route path="/mat" view=food::Calendar>
+                    <Route path="" view=food::Overview/>
+                </Route>
+                <Route path="/*" view=NotFound/>
+            </Routes>
+        </Router>
     }
 }
 

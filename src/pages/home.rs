@@ -1,16 +1,39 @@
+use std::collections::HashMap;
+
 use chrono::Local;
 
-use leptos::{logging::log, *};
+use leptos::{*};
 use leptos_icons::Icon;
 use leptos_router::*;
 use leptos_use::{storage::use_local_storage, utils::JsonCodec};
+use serde::{Deserialize, Serialize};
 use web_sys::SubmitEvent;
 
 use crate::{
     components::InputWrap,
-    destinations::{destinations, travel},
+    destinations::{destinations, travel, Travel},
     Trip, Trips,
 };
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+struct CustomTrips {
+    trips: HashMap<String, HashMap<String, Travel>>,
+}
+
+impl CustomTrips {
+    fn get(&self, from: &str, to: &str) -> Option<Travel> {
+        self.trips.get(from)?.get(to).cloned()
+    }
+    fn add(&mut self, trip: &Trip) {
+        let fr = trip.from.to_owned();
+        let to = trip.to.to_owned();
+        let tra: Travel = trip.into();
+        self.trips
+            .entry(fr)
+            .or_insert_with(HashMap::new)
+            .insert(to, tra);
+    }
+}
 
 /// Default Home Page
 #[component]
@@ -21,9 +44,9 @@ pub fn Home() -> impl IntoView {
         <div class="min-h-svh py-12">
             <div class="w-11/12 flex justify-around">
                 <QuickChoice trips=r_trips/>
-                <div class="form-control w-full max-w-sm outline my-6 p-6 outline-1 outline-primary rounded-xl">
+                <div class="form-control w-full max-w-sm outline my-6 p-6 outline-1 outline-primary rounded-xl h-fit">
                     <DestinationDataList/>
-                // <AddTravel write_to=w_trips/>
+                    <AddTravel write_to=w_trips/>
                 </div>
             </div>
         </div>
@@ -66,27 +89,33 @@ pub fn QuickChoiceRow(trip: Trip) -> impl IntoView {
         icondata::BsArrowRight
     };
     view! {
-        <li class="flex justify-between gap-x-6 py-5">
+        <li class="flex justify-between items-center gap-x-6 py-5">
             <div class="flex min-w-0 gap-x-4">
                 <div class="min-w-0 flex-auto">
-                    <p class="text-sm font-semibold leading-6 text-gray-900 flex gap-x-2 content-center">
+                    <p class="text-sm leading-6 text-gray-900 flex gap-x-2 content-center">
                         {trip.from.clone()} <Icon class="h-full place-self-center" icon=icon/>
                         {trip.to.clone()}
                     </p>
                 </div>
             </div>
-            <div class="hidden shrink-0 sm:flex sm:flex-col sm:items-end">
-                <p class="text-sm leading-6 text-gray-900"></p>
-                <p class="mt-1 text-xs leading-5 text-gray-500">{trip.time} min</p>
-            </div>
+            <Form action="" method="GET" class="hidden shrink-0 sm:flex sm:flex-col sm:items-end">
+                <input type="hidden" name="to" value=trip.to/>
+                <input type="hidden" name="from" value=trip.from/>
+                <input type="hidden" name="returning" value=trip.returning.to_string()/>
+                <button type="submit" class="btn btn-ghost btn-circle text-secondary">
+                    <Icon icon=icondata::IoAddCircleOutline class="size-6"/>
+                </button>
+            </Form>
         </li>
     }
 }
 
 #[component]
 pub fn AddTravel(write_to: WriteSignal<Trips>) -> impl IntoView {
+    let (r_custom, w_custom, _) = use_local_storage::<CustomTrips, JsonCodec>("my-custom-trips");
     let (r_from, w_from) = create_query_signal::<String>("from");
     let (r_to, w_to) = create_query_signal::<String>("to");
+    let (r_returning, w_returning) = create_query_signal::<bool>("returning");
     let (r_distance, w_distance) = create_signal(0.);
     let (r_time, w_time) = create_signal(0);
     let today = Local::now().date_naive().to_string();
@@ -95,10 +124,14 @@ pub fn AddTravel(write_to: WriteSignal<Trips>) -> impl IntoView {
         w_time(0)
     };
     let autopilot = move || {
-        with!(move |r_from, r_to| {
+        with!(move |r_from, r_to, r_custom| {
             if let (Some(f), Some(t)) = (r_from, r_to) {
                 if !f.is_empty() && !t.is_empty() {
-                    if let Some(travel_data) = travel(f, t) {
+                    if let Some(travel_data) = r_custom
+                        .get(f, t)
+                        .or_else(|| r_custom.get(t, f))
+                        .or_else(|| travel(f, t))
+                    {
                         w_distance(travel_data.km());
                         w_time(travel_data.minutes());
                     } else {
@@ -112,143 +145,157 @@ pub fn AddTravel(write_to: WriteSignal<Trips>) -> impl IntoView {
             }
         })
     };
-    create_effect(move |_| {
-        // r_from();
-        // r_to();
-        // autopilot();
-    });
-    let switch = move || {
-        let (ind_t, ind_f) = (r_to(), r_from());
-        w_to(None);
-        w_from(None);
-        w_to(ind_f);
-        w_from(ind_t);
+    let cleaner = move || {
+        if r_from.get_untracked() == r_to.get_untracked() {
+            w_to(None)
+        }
     };
+    let reset_returning =
+        move || {
+            let tim = gloo::timers::callback::Timeout::new(40, move || w_returning(Some(false)));
+            tim.forget();
+        };
+    create_effect(move |_| {
+        r_from.track();
+        r_to.track();
+        autopilot();
+        cleaner();
+    });
     let new = move |ev: SubmitEvent| {
         ev.prevent_default();
         let t = Trip::from_event(&ev);
         if let Ok(t) = t {
+            if travel(&t.from, &t.to).is_none() {
+                w_custom.update(|ct| ct.add(&t));
+            };
             write_to.update(|tr: &mut Trips| {
                 tr.add(t);
             });
-            switch();
+            zero_out();
+            reset_returning();
+            w_to(r_from.get_untracked());
         };
     };
 
     view! {
-        <form on:submit=new class="flex flex-col gap-3">
-            <InputWrap label="Datum">
-                <input
-                    name="date"
-                    type="date"
-                    value=today.clone()
-                    max=today
-                    class="input input-bordered w-full max-w-xs"
-                    required
-                />
-
-            </InputWrap>
-            <InputWrap label="Utgångspunkt">
-                <input
-                    name="from"
-                    prop:value=move || r_from().unwrap_or_default()
-                    list="destination-choices"
-                    class="input input-bordered w-full max-w-xs"
-                    required
-                    on:input=move |ev| {
-                        log!("Input 1");
-                        w_from(Some(event_target_value(&ev)));
-                    }
-                />
-
-            </InputWrap>
-            <InputWrap label="Resmål">
-                <input
-                    name="to"
-                    class="input input-bordered w-full max-w-xs"
-                    value=""
-                    prop:value=move || r_to().unwrap_or_default()
-                    list="destination-choices"
-                    required
-                    on:input=move |ev| {
-                        log!("Input 2");
-                        w_to(Some(event_target_value(&ev)));
-                    }
-                />
-
-            </InputWrap>
-            <div class="flex gap-2">
-                <InputWrap label="Avstånd" explanation="kilometer">
+        <div class="h-fit">
+            <form on:submit=new class="flex flex-col gap-3">
+                <InputWrap label="Datum">
                     <input
-                        name="distance"
-                        type="number"
-                        required
-                        min=0.1
-                        max=1000
-                        inputmode="decimal"
-                        step=0.1
+                        name="date"
+                        type="date"
+                        value=today.clone()
+                        max=today
                         class="input input-bordered w-full max-w-xs"
-                        value=r_distance
+                        required
+                    />
+
+                </InputWrap>
+                <InputWrap label="Utgångspunkt">
+                    <input
+                        name="from"
+                        prop:value=move || r_from().unwrap_or_default()
+                        list="destination-choices"
+                        class="input input-bordered w-full max-w-xs"
+                        required
                         on:input=move |ev| {
-                            let s: String = event_target_value(&ev);
-                            let d = s.parse::<f32>();
-                            if let Ok(d) = d {
-                                w_distance(d)
-                            }
+                            w_from(Some(event_target_value(&ev)));
                         }
                     />
 
                 </InputWrap>
-                <InputWrap label="Restid" explanation="minuter">
+                <InputWrap label="Resmål">
                     <input
-                        type="number"
-                        name="time"
-                        min=1
-                        max=1000
-                        inputmode="numeric"
-                        step=1
+                        name="to"
                         class="input input-bordered w-full max-w-xs"
-                        value=r_time
+                        value=""
+                        prop:value=move || r_to().unwrap_or_default()
+                        list="destination-choices"
                         required
                         on:input=move |ev| {
-                            let s: String = event_target_value(&ev);
-                            let d = s.parse::<u32>();
-                            if let Ok(d) = d {
-                                w_time(d)
-                            }
+                            w_to(Some(event_target_value(&ev)));
                         }
                     />
 
                 </InputWrap>
-            </div>
-            <InputWrap label="Anledning">
-                <input
-                    name="reason"
-                    value="Möte"
-                    class="input input-bordered w-full max-w-xs"
-                    required
-                />
-            </InputWrap>
+                <div class="flex gap-2">
+                    <InputWrap label="Avstånd" explanation="kilometer">
+                        <input
+                            name="distance"
+                            type="number"
+                            required
+                            min=0.1
+                            max=1000
+                            inputmode="decimal"
+                            step=0.1
+                            class="input input-bordered w-full max-w-xs"
+                            value=r_distance
+                            on:input=move |ev| {
+                                let s: String = event_target_value(&ev);
+                                let d = s.parse::<f32>();
+                                if let Ok(d) = d {
+                                    w_distance(d)
+                                }
+                            }
+                        />
 
-            <div class="form-control">
-                <label class="label cursor-pointer justify-start align-center gap-3">
+                    </InputWrap>
+                    <InputWrap label="Restid" explanation="minuter">
+                        <input
+                            type="number"
+                            name="time"
+                            min=1
+                            max=1000
+                            inputmode="numeric"
+                            step=1
+                            class="input input-bordered w-full max-w-xs"
+                            value=r_time
+                            required
+                            on:input=move |ev| {
+                                let s: String = event_target_value(&ev);
+                                let d = s.parse::<u32>();
+                                if let Ok(d) = d {
+                                    w_time(d)
+                                }
+                            }
+                        />
+
+                    </InputWrap>
+                </div>
+                <InputWrap label="Anledning">
                     <input
-                        name="returning"
-                        type="checkbox"
-                        value="true"
-                        class="checkbox bg-base-100 checkbox-primary"
+                        name="reason"
+                        value="Möte"
+                        class="input input-bordered w-full max-w-xs"
+                        required
                     />
-                    <span class="label-text">Tur och retur</span>
-                </label>
-            </div>
+                </InputWrap>
 
-            <button type="submit" class="btn btn-secondary btn-outline">
-                Lägg in
-            </button>
-            <button type="reset" class="btn btn-secondary btn-outline">
-                Nollställ
-            </button>
-        </form>
+                <div class="form-control">
+                    <label
+                        on:click=move |_e| {
+                            let switch = r_returning.get().and_then(|r| Some(!r)).or(Some(true));
+                            w_returning.set(switch);
+                        }
+
+                        class="label cursor-pointer justify-start align-center gap-3"
+                    >
+                        <input
+                            name="returning"
+                            checked=r_returning
+                            type="checkbox"
+                            value="true"
+                            class="checkbox bg-base-100 checkbox-primary"
+                        />
+                        <span class="label-text">Tur och retur</span>
+                    </label>
+                </div>
+
+                <button type="submit" class="btn btn-secondary btn-outline">
+                    Lägg in
+                </button>
+            </form>
+        </div>
     }
 }
 

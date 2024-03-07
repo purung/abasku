@@ -22,9 +22,10 @@ indicatif = { version = "0.17.7", optional = true }
 once_cell = "1.19.0"
 chrono = { version = "0.4.34", features = ["serde"] }
 uuid = { version = "1.7.0", features = ["js", "serde", "v4"] }
-leptos-use = { version = "0.10.2", features = ["serde"] }
+leptos-use = { version = "0.10.3", features = ["serde"] }
 leptos_icons = "0.3.0"
 icondata = "0.3.0"
+gloo = { version = "0.11", features = ["timers"] }
 
 # utils
 # strum = { version = "0.25", features = ["derive", "strum_macros"] }
