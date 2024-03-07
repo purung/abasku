@@ -169,7 +169,3 @@ rust-project.json
 # End of https://www.toptal.com/developers/gitignore/api/direnv,rust,rust-analyzer,node
 style/output.css
 .env
-.env
-.env
-style
-style/output.css
