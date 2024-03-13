@@ -55,6 +55,8 @@ pub fn Home() -> impl IntoView {
 
 #[component]
 pub fn QuickChoice(trips: Signal<Trips>) -> impl IntoView {
+    let no_favs = trips.with_untracked(|tr| tr.favorites().is_empty());
+    let no_recents = trips.with_untracked(|tr| tr.recent(5).is_empty());
     let favs = trips
         .with_untracked(|tr| tr.favorites())
         .into_iter()
@@ -68,12 +70,12 @@ pub fn QuickChoice(trips: Signal<Trips>) -> impl IntoView {
         .map(|f| view! { <QuickChoiceRow trip=f/> })
         .collect_view();
     view! {
-        <div class="flex flex-col xl:flex-row items-center xl:justify-around gap-12 justify-center">
+        <div class="flex flex-col xl:flex-row items-center xl:justify-around gap-12 justify-center" class:hidden=no_favs>
             <div class="flex flex-col gap-3">
                 <h2 class="text-2xl text-center">Favoriter</h2>
                 <div class="flex flex-col divide-y-2 ">{favs}</div>
             </div>
-            <div class="flex flex-col gap-3">
+            <div class="flex flex-col gap-3" class:hidden=no_recents>
                 <h2 class="text-2xl text-center">Senaste</h2>
                 <div class="flex flex-col divide-y-2 ">{recents}</div>
             </div>

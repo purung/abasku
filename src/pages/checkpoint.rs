@@ -54,6 +54,9 @@ impl Checkpoints {
     fn remove(&mut self, point: NaiveDate) {
         self.points.remove(&point);
     }
+    fn contains(&self, point: &NaiveDate) -> bool {
+        self.points.contains(point)
+    }
 }
 
 #[component]
@@ -93,38 +96,38 @@ pub fn CheckpointSummary() -> impl IntoView {
         r_trips.with(|tr| {
             tr.trips
                 .first()
-                .map(|t| t.date.checked_sub_days(Days::new(1)))
-                .unwrap()
-                .unwrap()
+                .map(|t| t.date.checked_sub_days(Days::new(1)).unwrap())
+        })
+    });
+    let last_checkpoint = Signal::derive(move || {
+        r_checkpoints.with(|ch| {
+            ch.points
+                .iter()
+                .max()
+                .filter(|d| !ch.contains(d))
+                .cloned()
+                .or_else(|| Some(Local::now().date_naive()))
         })
     });
     let cp_pairs: Signal<Vec<(NaiveDate, NaiveDate)>> = Signal::derive(move || {
-        std::iter::once_with(first_trip_date)
-            .chain(r_checkpoints().points.iter().cloned().rev())
+        first_trip_date().into_iter()
+            .chain(
+                r_checkpoints()
+                    .points
+                    .iter()
+                    .chain(last_checkpoint().iter())
+                    .cloned(),
+            )
+            .rev()
             .map_windows(|[x, y]| (x.clone(), y.clone()))
             .collect()
     });
     // let first_checkpoint =
     //     Signal::derive(move || r_checkpoints.with(|ch| ch.points.iter().min().unwrap().to_owned()));
 
-    let last_checkpoint =
-        Signal::derive(move || r_checkpoints.with(|ch| ch.points.iter().max().unwrap().to_owned()));
-    let begin = Signal::derive(move || {
-        (last_checkpoint() < Local::now().date_naive()).then(|| {
-            view! {
-                <Interval
-                    start=last_checkpoint.into()
-                    end=Local::now().date_naive().into()
-                    pool=r_trips
-                    food=r_meals
-                />
-            }
-        })
-    });
     view! {
         <AddCheckpoint w_checkpoints=w_checkpoints/>
         <div class="w-full max-w-xl flex flex-col gap-3">
-            {begin}
             <For
                 each=cp_pairs
                 key=|(x, y)| x.format("%Y-%m-%d").to_string() + &y.format("%Y-%m-%d").to_string()

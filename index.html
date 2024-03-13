@@ -5,8 +5,10 @@
     <!-- If using Tailwind with Leptos CSR, see https://trunkrs.dev/assets/#tailwind instead-->
 
     <!-- Include favicon in dist output: see https://trunkrs.dev/assets/#icon -->
-    <link data-trunk rel="icon" href="public/favicon.ico" />
+    <link data-trunk rel="icon" href="public/icons/icon-72.png" />
     <link data-trunk rel="css" rel="stylesheet" href="style/output.css" />
+    <link data-trunk rel="copy-dir" href="public" />
+    <link rel="manifest" href="public/manifest.json" />
     <!-- include support for `wasm-bindgen --weak-refs` - see: https://rustwasm.github.io/docs/wasm-bindgen/reference/weak-references.html -->
     <link data-trunk rel="rust" data-wasm-opt="z" data-weak-refs />
   </head>
