@@ -1,21 +1,21 @@
-use std::{collections::BTreeSet, fmt::Debug};
+use std::collections::BTreeSet;
 
 use chrono::{Datelike, Days, Local, Months, NaiveDate};
-use leptos::{logging::log, *};
-use leptos_icons::Icon;
-use leptos_router::{ActionForm, Form, FromFormData, Outlet};
-use leptos_use::{storage::use_local_storage, utils::JsonCodec};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use web_sys::{MouseEvent, SubmitEvent};
+use leptos::*;
 
-use crate::{components::InputWrap, Meals, Trip, Trips};
+use leptos_router::Outlet;
+use leptos_use::{storage::use_local_storage, utils::JsonCodec};
+
+use web_sys::MouseEvent;
+
+use crate::Meals;
 
 #[component]
 pub fn Calendar() -> impl IntoView {
     view! {
         <div class="grid min-h-svh">
-            <div class="w-11/12 place-self-center flex justify-center py-12">
+            <div class="w-11/12 place-self-center flex flex-col items-center gap-y-12 py-12">
+                <h2 class="text-2xl">Pedagogiska måltider</h2>
                 <Outlet/>
             </div>
         </div>
@@ -26,9 +26,12 @@ fn get_days_for_calendar_short(date: NaiveDate) -> BTreeSet<NaiveDate> {
     let first = date
         .checked_sub_days(Days::new(date.day0() as u64))
         .unwrap();
-    let first = first
-        .checked_sub_days(Days::new(first.weekday().number_from_monday() as u64 - 1))
-        .unwrap();
+    let offset_from_monday = first.weekday().number_from_monday() as u64 - 1;
+    let offset = match offset_from_monday {
+        0 => 7,
+        _ => offset_from_monday
+    };
+    let first = first.checked_sub_days(Days::new(offset)).unwrap();
     first.iter_days().take(6 * 7).collect()
 }
 
@@ -37,10 +40,10 @@ pub fn Overview() -> impl IntoView {
     let (r_meals, w_meals, _) = use_local_storage::<Meals, JsonCodec>("my-meals");
     let (r_current, w_current) = create_signal(Local::now().date_naive());
     let days = move || get_days_for_calendar_short(r_current.get_untracked());
-    let (r_days, w_days) = create_signal(Vec::from_iter(
-        days().iter().map(|d| create_rw_signal(d.clone())),
-    ));
+    let (r_days, w_days) =
+        create_signal(Vec::from_iter(days().iter().map(|d| create_rw_signal(*d))));
     create_effect(move |_| {
+        r_current.track();
         let new_days = days();
         w_days.update(|dt| {
             for (d, nd) in dt.iter_mut().zip(new_days.into_iter()) {
@@ -55,14 +58,15 @@ pub fn Overview() -> impl IntoView {
         w_current.update(|d| *d = d.checked_sub_months(Months::new(1)).unwrap());
     };
     let cells = move || {
-        r_days()
+        r_days
+            .get_untracked()
             .iter()
             .cloned()
             .map(|d| {
                 view! {
                     <CalendarCell
                         date=d.into()
-                        current=r_current.clone()
+                        current=r_current
                         selected=Signal::derive(move || r_meals().has(d()))
                         toggle=move |_| w_meals.update(|m| m.toggle(d()))
                     />
@@ -133,7 +137,7 @@ where
                 <button
                     type="button"
                     on:click=backward
-                    class="fr lx uo yz ze aqm axo bkw p-[0.375rem] justify-center items-center flex-none flex m-[-0.375rem]"
+                    class="p-[0.375rem] justify-center items-center flex-none flex m-[-0.375rem] btn btn-ghost btn-circle"
                 >
                     <span class="sr-only">Förra månaden</span>
                     <svg
@@ -150,11 +154,11 @@ where
                         ></path>
                     </svg>
                 </button>
-                <div class="font-semibold text-sm leading-5 ">{current_display}</div>
+                <div class="font-semibold text-sm leading-5 select-none ">{current_display}</div>
                 <button
                     on:click=forward
                     type="button"
-                    class="fr lx uo yz ze aqm axo bkw p-[0.375rem] justify-center items-center flex-none flex m-[-0.375rem]"
+                    class="p-[0.375rem] justify-center items-center flex-none flex m-[-0.375rem] btn btn-ghost btn-circle"
                 >
                     <span class="sr-only">Nästa månad</span>
                     <svg
@@ -172,7 +176,7 @@ where
                     </svg>
                 </button>
             </div>
-            <div class="lk mb ym avk awb awo axq text-primary leading-6 text-xs text-center grid-cols-7 grid mt-6">
+            <div class="text-primary leading-6 text-xs text-center grid-cols-7 grid mt-6">
                 <div>M</div>
                 <div>T</div>
                 <div>O</div>
@@ -181,7 +185,7 @@ where
                 <div>L</div>
                 <div>S</div>
             </div>
-            <div class="ec lb mb ym zu adt aij avz bbh bbs bcd bg-base-300 rounded-lg ring-1 ring-base-300 shadow-sm text-sm leading-5 border-2 gap-[1px] grid grid-cols-7 mt-2 isolate">
+            <div class="bg-base-300 rounded-lg ring-1 ring-base-300 shadow-sm text-sm leading-5 border-2 gap-[1px] grid grid-cols-7 mt-2 isolate">
                 {children()}
             </div>
         </div>

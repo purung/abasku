@@ -14,7 +14,7 @@ mod components;
 mod destinations;
 mod pages;
 
-use crate::pages::checkpoint::{AddCheckpoint, CheckpointSummary, Checkpoints, Report};
+use crate::pages::checkpoint::{CheckpointSummary, Checkpoints, Report};
 // Top-Level pages
 use crate::pages::food;
 use crate::pages::home::Home;
@@ -76,7 +76,7 @@ impl Trip {
         }
     }
     fn distance_for_human(&self) -> String {
-        format!("{} km", self.calculate_distance()).replace(".", ",")
+        format!("{} km", self.calculate_distance()).replace('.', ",")
     }
     fn from_to(&self) -> String {
         format!(
@@ -141,7 +141,7 @@ pub fn App() -> impl IntoView {
         <Html lang="sv" dir="ltr" attr:data-theme="light"/>
 
         // sets the document title
-        <Title text="Förbättrad självservice"/>
+        <Title text="Loggbok"/>
 
         // injects metadata in the <head> of the page
         <Meta charset="UTF-8"/>
@@ -153,7 +153,6 @@ pub fn App() -> impl IntoView {
                 <Route path="/" view=Home/>
                 <Route path="/checkpoint" view=Checkpoints>
                     <Route path="" view=CheckpointSummary/>
-                    <Route path="ny" view=AddCheckpoint/>
                     <Route path="report/:checkpoint" view=Report/>
                 </Route>
                 <Route path="/mat" view=food::Calendar>
@@ -170,7 +169,7 @@ pub fn Nav() -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
     view! {
         <nav class="navbar bg-secondary text-base-100">
-            <h1 class="flex-1">Självservice</h1>
+            <h1 class="flex-1"><A href="/">Självservice</A></h1>
             <div class="flex-none">
                 <ul class="menu menu-horizontal px-1">
                     <li>

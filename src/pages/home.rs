@@ -30,7 +30,7 @@ impl CustomTrips {
         let tra: Travel = trip.into();
         self.trips
             .entry(fr)
-            .or_insert_with(HashMap::new)
+            .or_default()
             .insert(to, tra);
     }
 }
@@ -42,7 +42,7 @@ pub fn Home() -> impl IntoView {
 
     view! {
         <div class="min-h-svh py-12">
-            <div class="w-11/12 flex justify-around">
+            <div class="w-11/12 flex justify-center gap-20">
                 <QuickChoice trips=r_trips/>
                 <div class="form-control w-full max-w-sm outline my-6 p-6 outline-1 outline-primary rounded-xl h-fit">
                     <DestinationDataList/>
@@ -68,7 +68,7 @@ pub fn QuickChoice(trips: Signal<Trips>) -> impl IntoView {
         .map(|f| view! { <QuickChoiceRow trip=f/> })
         .collect_view();
     view! {
-        <div class="flex flex-col gap-4 justify-center">
+        <div class="flex flex-col xl:flex-row items-center xl:justify-around gap-12 justify-center">
             <div class="flex flex-col gap-3">
                 <h2 class="text-2xl text-center">Favoriter</h2>
                 <div class="flex flex-col divide-y-2 ">{favs}</div>
@@ -274,7 +274,7 @@ pub fn AddTravel(write_to: WriteSignal<Trips>) -> impl IntoView {
                 <div class="form-control">
                     <label
                         on:click=move |_e| {
-                            let switch = r_returning.get().and_then(|r| Some(!r)).or(Some(true));
+                            let switch = r_returning.get().map(|r| !r).or(Some(true));
                             w_returning.set(switch);
                         }
 

@@ -42,10 +42,10 @@ impl Travel {
     }
 }
 
-impl Into<Travel> for &Trip {
-    fn into(self) -> Travel {
-        let dur = Duration::new(format!("{} min", self.time), self.time * 60);
-        let dis = Distance::new(self.distance_for_human(), (self.distance * 1000.) as u32);
+impl From<&Trip> for Travel {
+    fn from(val: &Trip) -> Self {
+        let dur = Duration::new(format!("{} min", val.time), val.time * 60);
+        let dis = Distance::new(val.distance_for_human(), (val.distance * 1000.) as u32);
         Travel::new(dis, dur)
     }
 }
