@@ -169,17 +169,17 @@ pub fn Nav() -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
     view! {
         <nav class="navbar bg-secondary text-base-100">
-            <h1 class="flex-1"><A href="/">Självservice</A></h1>
+            <h1 class="flex-1"><A href="/abasku">Självservice</A></h1>
             <div class="flex-none">
                 <ul class="menu menu-horizontal px-1">
                     <li>
-                        <A href="/">Resa</A>
+                        <A href="/abasku">Resa</A>
                     </li>
                     <li>
-                        <A href="/checkpoint">Avstämning</A>
+                        <A href="/abasku/checkpoint">Avstämning</A>
                     </li>
                     <li>
-                        <A href="/mat">Måltider</A>
+                        <A href="/abasku/mat">Måltider</A>
                     </li>
                 </ul>
             </div>
