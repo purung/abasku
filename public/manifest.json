@@ -2,7 +2,7 @@
   "name": "Loggbok",
 	"id": "/",
   "short_name": "Loggbok",
-  "start_url": "/",
+  "start_url": "/abasku",
 	"display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "display": "standalone",
   "theme_color": "#81a1c1",

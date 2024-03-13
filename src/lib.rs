@@ -150,12 +150,12 @@ pub fn App() -> impl IntoView {
         <Router>
             <Nav/>
             <Routes>
-                <Route path="/" view=Home/>
-                <Route path="/checkpoint" view=Checkpoints>
+                <Route path="/abasku" view=Home/>
+                <Route path="/abasku/checkpoint" view=Checkpoints>
                     <Route path="" view=CheckpointSummary/>
                     <Route path="report/:checkpoint" view=Report/>
                 </Route>
-                <Route path="/mat" view=food::Calendar>
+                <Route path="/abasku/mat" view=food::Calendar>
                     <Route path="" view=food::Overview/>
                 </Route>
                 <Route path="/*" view=NotFound/>
