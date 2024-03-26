@@ -1,6 +1,11 @@
-use std::collections::BTreeSet;
+use std::{
+    collections::{BTreeSet, HashMap},
+    num::ParseIntError,
+    string::ParseError,
+};
 
-use chrono::{Days, Local, NaiveDate};
+use chrono::{Datelike, Days, Local, Months, NaiveDate};
+use itertools::Itertools;
 use leptos::{logging::log, *};
 use leptos_icons::Icon;
 use leptos_router::{use_params_map, Form, FromFormData, Outlet, A};
@@ -16,6 +21,63 @@ struct Killring {
     marked: BTreeSet<Uuid>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, Hash)]
+pub struct Month {
+    year: i32,
+    month: u32,
+}
+
+impl TryFrom<(&String, &String)> for Month {
+    type Error = ParseIntError;
+
+    fn try_from((y, m): (&String, &String)) -> Result<Self, Self::Error> {
+        Ok(Self::new(y.parse()?, m.parse()?))
+    }
+}
+
+impl Month {
+    fn new(year: i32, month: u32) -> Self {
+        Self { year, month }
+    }
+
+    pub fn first_of(&self) -> NaiveDate {
+        NaiveDate::from_ymd_opt(self.year, self.month, 1).unwrap()
+    }
+    pub fn last_of(&self) -> NaiveDate {
+        NaiveDate::from_ymd_opt(self.year, self.month + 1, 1)
+            .or_else(|| NaiveDate::from_ymd_opt(self.year + 1, 1, 1))
+            .unwrap()
+            .pred_opt()
+            .unwrap()
+    }
+    fn fmt_human(&self) -> String {
+        format!("{} {}", self.human_month_name(), self.year)
+    }
+    fn human_month_name(&self) -> &'static str {
+        match self.month {
+            1 => "januari",
+            2 => "februari",
+            3 => "mars",
+            4 => "april",
+            5 => "maj",
+            6 => "juni",
+            7 => "juli",
+            8 => "augusti",
+            9 => "september",
+            10 => "oktober",
+            11 => "november",
+            12 => "december",
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl From<(i32, u32)> for Month {
+    fn from(value: (i32, u32)) -> Self {
+        Self::new(value.0, value.1)
+    }
+}
+
 impl Killring {
     fn new() -> Self {
         Self {
@@ -26,37 +88,31 @@ impl Killring {
     fn add(&mut self, trip: Uuid) {
         self.marked.insert(trip);
     }
-    fn remove(&mut self, uuid: &Uuid) {
-        self.marked.remove(uuid);
-    }
     fn contains(&self, trip: &Uuid) -> bool {
         self.marked.contains(trip)
     }
-    fn clear(&mut self) {
-        self.marked.clear();
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct MonthStatistic {
+    distance: f32,
+    time: u32,
+    meal_count: usize,
+}
+
+impl MonthStatistic {
+    fn new(distance: f32, time: u32, meal_count: usize) -> Self {
+        Self {
+            distance,
+            time,
+            meal_count,
+        }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 struct WEvent {
     date: NaiveDate,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
-struct Checkpoints {
-    points: BTreeSet<NaiveDate>,
-}
-
-impl Checkpoints {
-    fn add(&mut self, new: NaiveDate) {
-        self.points.insert(new);
-    }
-    fn remove(&mut self, point: NaiveDate) {
-        self.points.remove(&point);
-    }
-    fn contains(&self, point: &NaiveDate) -> bool {
-        self.points.contains(point)
-    }
 }
 
 #[component]
@@ -74,66 +130,43 @@ pub fn Checkpoints() -> impl IntoView {
 pub fn CheckpointSummary() -> impl IntoView {
     let (r_trips, w_trips, _) = use_local_storage::<Trips, JsonCodec>("my-trips");
     let (r_meals, _w_meals, _) = use_local_storage::<Meals, JsonCodec>("my-meals");
-    let (r_checkpoints, w_checkpoints, _) =
-        use_local_storage::<Checkpoints, JsonCodec>("my-checkpoints");
     let kill_ring = RwSignal::new(Killring::new());
     provide_context((w_trips, kill_ring));
-    provide_context(w_checkpoints);
-    // let cp_pairs = Signal::derive(move || {
-    //     r_checkpoints()
-    //         .points
-    //         .iter()
-    //         .cloned()
-    //         .rev()
-    //         .map_windows(|[&x, &y]| {
-    //             let (x, y) = (x, y);
-    //             view! { <Interval start=y.into() end=x.into() pool=r_trips food=r_meals/> }
-    //         })
-    //         .collect_view()
-    // });
-
-    let first_trip_date = Signal::derive(move || {
-        r_trips.with(|tr| {
-            tr.trips
-                .first()
-                .map(|t| t.date.checked_sub_days(Days::new(1)).unwrap())
+    let months: Signal<Vec<(Month, Vec<Trip>)>> = Signal::derive(move || {
+        let groups = &r_trips()
+            .trips
+            .into_iter()
+            .group_by(|t| (t.date.year(), t.date.month()));
+        groups
+            .into_iter()
+            .map(|(ym, tr)| (ym.into(), tr.into_iter().collect_vec()))
+            .collect_vec()
+    });
+    let statistics: Signal<HashMap<Month, MonthStatistic>> = Signal::derive(move || {
+        with!(|months, r_meals| {
+            HashMap::from_iter(months.iter().map(|(ym, dt)| {
+                (
+                    ym.to_owned(),
+                    MonthStatistic::new(
+                        dt.iter().map(|d| d.calculate_distance()).sum(),
+                        dt.iter().map(|d| d.calculate_time()).sum(),
+                        r_meals.in_month(ym),
+                    ),
+                )
+            }))
         })
     });
-    let last_checkpoint = Signal::derive(move || {
-        r_checkpoints.with(|ch| {
-            ch.points
-                .iter()
-                .max()
-                .filter(|d| !ch.contains(d))
-                .cloned()
-                .or_else(|| Some(Local::now().date_naive()))
-        })
-    });
-    let cp_pairs: Signal<Vec<(NaiveDate, NaiveDate)>> = Signal::derive(move || {
-        first_trip_date().into_iter()
-            .chain(
-                r_checkpoints()
-                    .points
-                    .iter()
-                    .chain(last_checkpoint().iter())
-                    .cloned(),
-            )
-            .rev()
-            .map_windows(|[x, y]| (x.clone(), y.clone()))
-            .collect()
-    });
-    // let first_checkpoint =
-    //     Signal::derive(move || r_checkpoints.with(|ch| ch.points.iter().min().unwrap().to_owned()));
-
     view! {
-        <AddCheckpoint w_checkpoints=w_checkpoints/>
         <div class="w-full max-w-xl flex flex-col gap-3">
-            <For
-                each=cp_pairs
-                key=|(x, y)| x.format("%Y-%m-%d").to_string() + &y.format("%Y-%m-%d").to_string()
-                let:iva
-            >
-                <Interval start=iva.1.into() end=iva.0.into() pool=r_trips food=r_meals/>
+            <For each=months key=|(ym, _)| ym.to_owned() let:iva>
+                <Interval
+                    month=iva.0.to_owned()
+                    statistics=Signal::derive(move || {
+                        statistics.with(|s| s.get(&iva.0).cloned().unwrap())
+                    })
+
+                    trips=iva.1
+                />
             </For>
         </div>
     }
@@ -141,56 +174,33 @@ pub fn CheckpointSummary() -> impl IntoView {
 
 #[component]
 pub fn Interval(
-    start: MaybeSignal<NaiveDate>,
-    end: MaybeSignal<NaiveDate>,
-    pool: Signal<Trips>,
-    food: Signal<Meals>,
+    month: Month,
+    statistics: Signal<MonthStatistic>,
+    trips: Vec<Trip>,
 ) -> impl IntoView {
-    let date_str = start().format("%Y-%m-%d").to_string();
-    let end_str = end().format("%Y-%m-%d").to_string();
-    let filtered: Signal<Vec<Trip>> = Signal::derive(move || {
-        pool()
-            .trips
-            .iter()
-            .rev()
-            .filter(|&t| t.date > start() && t.date <= end())
-            .cloned()
-            .collect()
-    });
+    let date_str = month.fmt_human();
     let distance = Signal::derive(move || {
-        let dist = filtered()
-            .iter()
-            .map(|t| t.calculate_distance())
-            .sum::<f32>();
+        let dist = statistics.with(|s| s.distance);
         format!("{dist:.1}").replace('.', ",")
     });
     let time = Signal::derive(move || {
-        let tim = filtered().iter().map(|t| t.time).sum::<u32>() as f32 / 60.;
+        let tim = statistics.with(|s| s.time as f32 / 60.);
         format!("{tim:.1}").replace('.', ",")
     });
-    let trip_views = Signal::derive(move || {
-        filtered
-            .get_untracked()
-            .into_iter()
-            .map(|t| {
-                view! { <TripRow trip=t/> }
-            })
-            .collect_view()
-    });
-    let href = format!("report/{end_str}");
-    let meals_count = Signal::derive(move || food().in_period(&start(), &end()));
-    let w_checkpoints = expect_context::<WriteSignal<Checkpoints>>();
-    let delete = move |_| w_checkpoints.update(|c| c.remove(end()));
+    let meals_count = Signal::derive(move || statistics.with(|s| s.meal_count));
+    let trip_views = trips
+        .into_iter()
+        .map(|t| {
+            view! { <TripRow trip=t/> }
+        })
+        .collect_view();
+    let href = format!("report/{}/{}", month.year, month.month);
     view! {
         <div class="collapse bg-base-200">
             <input type="checkbox" class="h-full w-full"/>
             <div class="collapse-title flex justify-between">
 
-                <div class="text-xl font-medium flex gap-3">
-                    {date_str}
-                    <Icon icon=icondata::BiArrowFromLeftSolid class="size-6 pt-1 text-2xl"/>
-                    {end_str.clone()}
-                </div>
+                <div class="text-xl font-medium flex gap-3 capitalize">{date_str}</div>
                 <div class="flex text-xl gap-3 pt-1 h-min">
                     <div class="place-self-center flex gap-1">
                         <Icon icon=icondata::FaCarSideSolid/>
@@ -211,29 +221,6 @@ pub fn Interval(
             <div class="collapse-content">
                 <ul role="list" class="divide-y divide-gray-100">
                     <li class="flex justify-around pb-4">
-                        <div class="dropdown">
-                            <div
-                                tabindex="0"
-                                role="button"
-                                class="btn btn-sm btn-outline btn-primary"
-                                class=("invisible", move || false)
-                            >
-                                Radera checkpoint
-                            </div>
-                            <ul
-                                tabindex="0"
-                                class="dropdown-content z-40 grid menu shadow bg-base-100 rounded-box w-52"
-                            >
-                                <li>
-                                    <button
-                                        on:click=delete
-                                        class="btn btn-warning place-self-center w-full flex justify-center content-center"
-                                    >
-                                        <p class="place-self-center">Ja, radera checkpoint</p>
-                                    </button>
-                                </li>
-                            </ul>
-                        </div>
                         <A href=href class="btn btn-sm btn-outline btn-primary">
                             Generera rapport
                         </A>
@@ -312,83 +299,29 @@ pub fn TripRow(trip: Trip) -> impl IntoView {
         </li>
     }
 }
-/// Default Checkpoint Page
-#[component]
-fn AddCheckpoint(w_checkpoints: WriteSignal<Checkpoints>) -> impl IntoView {
-    let new = move |ev: SubmitEvent| {
-        ev.prevent_default();
-        let t = WEvent::from_event(&ev);
-        if let Ok(t) = t {
-            w_checkpoints.update(|cp| cp.add(t.date));
-        };
-    };
-    let today = Local::now().date_naive().to_string();
-    view! {
-        <div class="form-control w-full max-w-xs outline p-6 outline-1 outline-primary rounded-xl">
-            <Form action="/checkpoint" method="GET" on:submit=new class="flex flex-col gap-3">
-                <InputWrap label="Ny checkpoint">
-                    <input
-                        name="date"
-                        type="date"
-                        value=today.clone()
-                        max=today
-                        class="input input-bordered w-full max-w-xs"
-                        required
-                    />
-
-                </InputWrap>
-                <button type="submit" class="btn btn-secondary btn-outline">
-                    Lägg till
-                </button>
-            </Form>
-        </div>
-    }
-}
-
 #[component]
 pub fn Report() -> impl IntoView {
     let (r_trips, _, _) = use_local_storage::<Trips, JsonCodec>("my-trips");
-    let (r_checkpoints, _, _) = use_local_storage::<Checkpoints, JsonCodec>("my-checkpoints");
-    let selected_checkpoint = use_params_map()
-        .get_untracked()
-        .get("checkpoint")
-        .and_then(|t| t.parse::<NaiveDate>().ok())
-        .unwrap_or_else(move || {
-            r_checkpoints
-                .get_untracked()
-                .points
-                .iter()
-                .last()
-                .cloned()
-                .unwrap_or_else(|| Local::now().date_naive())
-        });
-    let start = r_checkpoints
-        .get_untracked()
-        .points
-        .iter()
-        .rev()
-        .find(|f| **f < selected_checkpoint)
-        .cloned()
+    let checkpoints = use_params_map().get_untracked();
+    let month = checkpoints
+        .get("year")
+        .zip(checkpoints.get("month"))
+        .and_then(|ym| ym.try_into().ok())
         .unwrap_or_else(|| {
-            r_trips
-                .get_untracked()
-                .trips
-                .iter()
-                .map(|t| &t.date)
-                .min()
-                .cloned()
-                .unwrap_or_else(|| Local::now().date_naive())
-                .checked_sub_days(Days::new(1))
-                .unwrap()
+            log!("Kunde inte hitta eller konvertera");
+            let now = Local::now().date_naive().checked_sub_months(Months::new(1)).unwrap();
+            Month::new(now.year(), now.month())
         });
+    let start = month.first_of();
+    let last = month.last_of();
     let date_str = start.format("%Y-%m-%d").to_string();
-    let end_str = selected_checkpoint.format("%Y-%m-%d").to_string();
+    let end_str = last.format("%Y-%m-%d").to_string();
     let filtered: Vec<Trip> = r_trips
         .get_untracked()
         .trips
         .iter()
         .rev()
-        .filter(|&t| t.date > start && t.date <= selected_checkpoint)
+        .filter(|&t| t.date >= start && t.date <= last)
         .cloned()
         .collect();
     let distance = filtered.iter().map(|t| t.calculate_distance()).sum::<f32>();
@@ -424,7 +357,7 @@ pub fn Report() -> impl IntoView {
                 <div class="flex text-xl place-self-center gap-3">
                     <div class="place-self-center flex items-center gap-2">
                         <Icon icon=icondata::TbSum/>
-                        <span class="place-self-center text-sm ">{distance} kms</span>
+                        <span class="place-self-center text-sm ">{distance} km</span>
                     </div>
 
                     <div class="place-self-center flex items-center gap-2">

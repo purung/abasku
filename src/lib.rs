@@ -6,6 +6,7 @@ use chrono::NaiveDate;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+use pages::checkpoint::Month;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -75,6 +76,13 @@ impl Trip {
             self.distance
         }
     }
+    fn calculate_time(&self) -> u32 {
+        if self.returning {
+            self.time * 2
+        } else {
+            self.time
+        }
+    }
     fn distance_for_human(&self) -> String {
         format!("{} km", self.calculate_distance()).replace('.', ",")
     }
@@ -129,6 +137,14 @@ impl Meals {
             .filter(|f| *f > after && *f <= before_inclusive)
             .count()
     }
+    fn in_month(&self, month: &Month) -> usize {
+        let first = month.first_of();
+        let last = month.last_of();
+        self.points
+            .iter()
+            .filter(|f| *f >= &first && *f <= &last)
+            .count()
+    }
 }
 
 /// An app router which renders the homepage and handles 404's
@@ -153,7 +169,7 @@ pub fn App() -> impl IntoView {
                 <Route path="/abasku" view=Home/>
                 <Route path="/abasku/checkpoint" view=Checkpoints>
                     <Route path="" view=CheckpointSummary/>
-                    <Route path="report/:checkpoint" view=Report/>
+                    <Route path="report/:year/:month" view=Report/>
                 </Route>
                 <Route path="/abasku/mat" view=food::Calendar>
                     <Route path="" view=food::Overview/>
@@ -169,7 +185,7 @@ pub fn Nav() -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
     view! {
         <nav class="navbar bg-secondary text-base-100">
-            <h1 class="flex-1"><A href="/abasku">Självservice</A></h1>
+            <h1 class="flex-1"><A href="/abasku">Loggbok</A></h1>
             <div class="flex-none">
                 <ul class="menu menu-horizontal px-1">
                     <li>

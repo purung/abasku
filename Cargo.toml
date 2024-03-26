@@ -26,6 +26,7 @@ leptos-use = { version = "0.10.3", features = ["serde"] }
 leptos_icons = "0.3.0"
 icondata = "0.3.0"
 gloo = { version = "0.11", features = ["timers"] }
+itertools = "0.12.1"
 
 # utils
 # strum = { version = "0.25", features = ["derive", "strum_macros"] }

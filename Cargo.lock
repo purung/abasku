@@ -2797,6 +2797,7 @@ dependencies = [
  "google_maps",
  "icondata",
  "indicatif",
+ "itertools",
  "leptos",
  "leptos-use",
  "leptos_icons",

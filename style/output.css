@@ -2778,11 +2778,6 @@ details.collapse summary::-webkit-details-marker {
   height: 1.75rem;
 }
 
-.size-3 {
-  width: 0.75rem;
-  height: 0.75rem;
-}
-
 .h-fit {
   height: -moz-fit-content;
   height: fit-content;
@@ -2865,10 +2860,6 @@ details.collapse summary::-webkit-details-marker {
 
 .flex-col {
   flex-direction: column;
-}
-
-.place-items-center {
-  place-items: center;
 }
 
 .content-center {
@@ -2965,10 +2956,6 @@ details.collapse summary::-webkit-details-marker {
   place-self: center;
 }
 
-.justify-self-center {
-  justify-self: center;
-}
-
 .truncate {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3056,10 +3043,6 @@ details.collapse summary::-webkit-details-marker {
   padding-bottom: 1rem;
 }
 
-.pt-2 {
-  padding-top: 0.5rem;
-}
-
 .pt-1 {
   padding-top: 0.25rem;
 }
@@ -3098,6 +3081,10 @@ details.collapse summary::-webkit-details-marker {
 
 .font-semibold {
   font-weight: 600;
+}
+
+.capitalize {
+  text-transform: capitalize;
 }
 
 .italic {
@@ -3217,14 +3204,6 @@ details.collapse summary::-webkit-details-marker {
 @media (min-width: 1280px) {
   .xl\:flex-row {
     flex-direction: row;
-  }
-
-  .xl\:items-start {
-    align-items: flex-start;
-  }
-
-  .xl\:justify-center {
-    justify-content: center;
   }
 
   .xl\:justify-around {
