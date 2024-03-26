@@ -136,6 +136,7 @@ pub fn CheckpointSummary() -> impl IntoView {
         let groups = &r_trips()
             .trips
             .into_iter()
+            .rev()
             .group_by(|t| (t.date.year(), t.date.month()));
         groups
             .into_iter()
@@ -309,7 +310,10 @@ pub fn Report() -> impl IntoView {
         .and_then(|ym| ym.try_into().ok())
         .unwrap_or_else(|| {
             log!("Kunde inte hitta eller konvertera");
-            let now = Local::now().date_naive().checked_sub_months(Months::new(1)).unwrap();
+            let now = Local::now()
+                .date_naive()
+                .checked_sub_months(Months::new(1))
+                .unwrap();
             Month::new(now.year(), now.month())
         });
     let start = month.first_of();
@@ -389,3 +393,4 @@ pub fn Report() -> impl IntoView {
         </div>
     }
 }
+
