@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use web_sys::SubmitEvent;
 
-use crate::{components::InputWrap, Meals, Trip, Trips};
+use crate::{components::InputWrap, Trip, Trips};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 struct Killring {
@@ -97,15 +97,13 @@ impl Killring {
 pub struct MonthStatistic {
     distance: f32,
     time: u32,
-    meal_count: usize,
 }
 
 impl MonthStatistic {
-    fn new(distance: f32, time: u32, meal_count: usize) -> Self {
+    fn new(distance: f32, time: u32) -> Self {
         Self {
             distance,
             time,
-            meal_count,
         }
     }
 }
@@ -129,7 +127,6 @@ pub fn Checkpoints() -> impl IntoView {
 #[component]
 pub fn CheckpointSummary() -> impl IntoView {
     let (r_trips, w_trips, _) = use_local_storage::<Trips, JsonCodec>("my-trips");
-    let (r_meals, _w_meals, _) = use_local_storage::<Meals, JsonCodec>("my-meals");
     let kill_ring = RwSignal::new(Killring::new());
     provide_context((w_trips, kill_ring));
     let months: Signal<Vec<(Month, Vec<Trip>)>> = Signal::derive(move || {
@@ -144,14 +141,13 @@ pub fn CheckpointSummary() -> impl IntoView {
             .collect_vec()
     });
     let statistics: Signal<HashMap<Month, MonthStatistic>> = Signal::derive(move || {
-        with!(|months, r_meals| {
+        with!(|months| {
             HashMap::from_iter(months.iter().map(|(ym, dt)| {
                 (
                     ym.to_owned(),
                     MonthStatistic::new(
                         dt.iter().map(|d| d.calculate_distance()).sum(),
                         dt.iter().map(|d| d.calculate_time()).sum(),
-                        r_meals.in_month(ym),
                     ),
                 )
             }))
@@ -188,7 +184,6 @@ pub fn Interval(
         let tim = statistics.with(|s| s.time as f32 / 60.);
         format!("{tim:.1}").replace('.', ",")
     });
-    let meals_count = Signal::derive(move || statistics.with(|s| s.meal_count));
     let trip_views = trips
         .into_iter()
         .map(|t| {
@@ -213,10 +208,6 @@ pub fn Interval(
                         <span class="place-self-center text-sm ">{time} h</span>
                     </div>
 
-                    <div class="place-self-center flex gap-1">
-                        <Icon icon=icondata::TbPizza/>
-                        <span class="place-self-center text-sm ">{meals_count}</span>
-                    </div>
                 </div>
             </div>
             <div class="collapse-content">

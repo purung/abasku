@@ -17,7 +17,6 @@ mod pages;
 
 use crate::pages::checkpoint::{CheckpointSummary, Checkpoints, Report};
 // Top-Level pages
-use crate::pages::food;
 use crate::pages::home::Home;
 use crate::pages::not_found::NotFound;
 
@@ -109,43 +108,6 @@ impl Trip {
         format!("{date}: {points}{p_1}{distance}{p_2}{reason}")
     }
 }
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
-struct Meals {
-    points: BTreeSet<NaiveDate>,
-}
-
-impl Meals {
-    fn add(&mut self, new: NaiveDate) {
-        self.points.insert(new);
-    }
-    fn remove(&mut self, point: NaiveDate) {
-        self.points.remove(&point);
-    }
-    fn has(&self, date: NaiveDate) -> bool {
-        self.points.contains(&date)
-    }
-    fn toggle(&mut self, date: NaiveDate) {
-        if self.has(date) {
-            self.remove(date)
-        } else {
-            self.add(date)
-        }
-    }
-    fn in_period(&self, after: &NaiveDate, before_inclusive: &NaiveDate) -> usize {
-        self.points
-            .iter()
-            .filter(|f| *f > after && *f <= before_inclusive)
-            .count()
-    }
-    fn in_month(&self, month: &Month) -> usize {
-        let first = month.first_of();
-        let last = month.last_of();
-        self.points
-            .iter()
-            .filter(|f| *f >= &first && *f <= &last)
-            .count()
-    }
-}
 
 /// An app router which renders the homepage and handles 404's
 #[component]
@@ -171,9 +133,6 @@ pub fn App() -> impl IntoView {
                     <Route path="" view=CheckpointSummary/>
                     <Route path="report/:year/:month" view=Report/>
                 </Route>
-                <Route path="/abasku/mat" view=food::Calendar>
-                    <Route path="" view=food::Overview/>
-                </Route>
                 <Route path="/*" view=NotFound/>
             </Routes>
         </Router>
@@ -193,9 +152,6 @@ pub fn Nav() -> impl IntoView {
                     </li>
                     <li>
                         <A href="/abasku/checkpoint">Avstämning</A>
-                    </li>
-                    <li>
-                        <A href="/abasku/mat">Måltider</A>
                     </li>
                 </ul>
             </div>
