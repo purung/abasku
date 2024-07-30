@@ -2,7 +2,8 @@ use std::{collections::HashMap, ops::Not};
 
 use chrono::Local;
 
-use leptos::{*};
+use itertools::Itertools;
+use leptos::*;
 use leptos_icons::Icon;
 use leptos_router::*;
 use leptos_use::{storage::use_local_storage, utils::JsonCodec};
@@ -28,10 +29,7 @@ impl CustomTrips {
         let fr = trip.from.to_owned();
         let to = trip.to.to_owned();
         let tra: Travel = trip.into();
-        self.trips
-            .entry(fr)
-            .or_default()
-            .insert(to, tra);
+        self.trips.entry(fr).or_default().insert(to, tra);
     }
 }
 
@@ -41,7 +39,7 @@ pub fn Home() -> impl IntoView {
     let (r_trips, w_trips, _) = use_local_storage::<Trips, JsonCodec>("my-trips");
     let from = create_rw_signal(None);
     let to = create_rw_signal(None);
-    let returning  = create_rw_signal(None);
+    let returning = create_rw_signal(None);
 
     view! {
         <div class="min-h-svh py-12">
@@ -49,7 +47,7 @@ pub fn Home() -> impl IntoView {
                 <QuickChoice trips=r_trips from to returning/>
                 <div class="form-control w-full max-w-sm outline my-6 p-6 outline-1 outline-primary rounded-xl h-fit">
                     <DestinationDataList/>
-                    <AddTravel write_to=w_trips from to returning />
+                    <AddTravel write_to=w_trips from to returning/>
                 </div>
             </div>
         </div>
@@ -64,7 +62,12 @@ struct NavTrip {
 }
 
 #[component]
-pub fn QuickChoice(trips: Signal<Trips>, from: RwSignal<Option<String>>, to: RwSignal<Option<String>>, returning: RwSignal<Option<bool>>) -> impl IntoView {
+pub fn QuickChoice(
+    trips: Signal<Trips>,
+    from: RwSignal<Option<String>>,
+    to: RwSignal<Option<String>>,
+    returning: RwSignal<Option<bool>>,
+) -> impl IntoView {
     let no_favs = trips.with_untracked(|tr| tr.favorites().is_empty());
     let no_recents = trips.with_untracked(|tr| tr.recent(5).is_empty());
     let (_, w_from) = from.split();
@@ -73,26 +76,33 @@ pub fn QuickChoice(trips: Signal<Trips>, from: RwSignal<Option<String>>, to: RwS
 
     let on_submit = Callback::<SubmitEvent>::from(move |ev: SubmitEvent| {
         ev.prevent_default();
-        let NavTrip { from, to, returning } = NavTrip::from_event(&ev).unwrap_or_default();
+        let NavTrip {
+            from,
+            to,
+            returning,
+        } = NavTrip::from_event(&ev).unwrap_or_default();
         w_from(from);
         w_to(to);
         w_returning(returning)
- } );
+    });
 
     let favs = trips
         .with_untracked(|tr| tr.favorites())
         .into_iter()
         .map(|f| {
-            view! { <QuickChoiceRow trip=f on_submit /> }
+            view! { <QuickChoiceRow trip=f on_submit/> }
         })
         .collect_view();
     let recents = trips
         .with_untracked(|tr| tr.recent(5))
         .into_iter()
-        .map(|f| view! { <QuickChoiceRow trip=f on_submit /> })
+        .map(|f| view! { <QuickChoiceRow trip=f on_submit/> })
         .collect_view();
     view! {
-        <div class="flex flex-col xl:flex-row items-center xl:justify-around gap-12 justify-center" class:hidden=no_favs>
+        <div
+            class="flex flex-col xl:flex-row items-center xl:justify-around gap-12 justify-center"
+            class:hidden=no_favs
+        >
             <div class="flex flex-col gap-3">
                 <h2 class="text-2xl text-center">Favoriter</h2>
                 <div class="flex flex-col divide-y-2 ">{favs}</div>
@@ -122,7 +132,12 @@ pub fn QuickChoiceRow(trip: Trip, on_submit: Callback<SubmitEvent>) -> impl Into
                     </p>
                 </div>
             </div>
-            <Form action="" on:submit=on_submit method="GET" class="hidden shrink-0 sm:flex sm:flex-col sm:items-end">
+            <Form
+                action=""
+                on:submit=on_submit
+                method="GET"
+                class="hidden shrink-0 sm:flex sm:flex-col sm:items-end"
+            >
                 <input type="hidden" name="to" value=trip.to/>
                 <input type="hidden" name="from" value=trip.from/>
                 <input type="hidden" name="returning" value=trip.returning.to_string()/>
@@ -135,7 +150,12 @@ pub fn QuickChoiceRow(trip: Trip, on_submit: Callback<SubmitEvent>) -> impl Into
 }
 
 #[component]
-pub fn AddTravel(write_to: WriteSignal<Trips>, from: RwSignal<Option<String>>, to: RwSignal<Option<String>>, returning: RwSignal<Option<bool>>) -> impl IntoView {
+pub fn AddTravel(
+    write_to: WriteSignal<Trips>,
+    from: RwSignal<Option<String>>,
+    to: RwSignal<Option<String>>,
+    returning: RwSignal<Option<bool>>,
+) -> impl IntoView {
     let (r_custom, w_custom, _) = use_local_storage::<CustomTrips, JsonCodec>("my-custom-trips");
     let (r_from, w_from) = from.split();
     let (r_to, w_to) = to.split();
@@ -174,11 +194,10 @@ pub fn AddTravel(write_to: WriteSignal<Trips>, from: RwSignal<Option<String>>, t
             w_to(None)
         }
     };
-    let reset_returning =
-        move || {
-            let tim = gloo::timers::callback::Timeout::new(40, move || w_returning(Some(false)));
-            tim.forget();
-        };
+    let reset_returning = move || {
+        let tim = gloo::timers::callback::Timeout::new(40, move || w_returning(Some(false)));
+        tim.forget();
+    };
     create_effect(move |_| {
         r_from.track();
         r_to.track();
@@ -198,10 +217,9 @@ pub fn AddTravel(write_to: WriteSignal<Trips>, from: RwSignal<Option<String>>, t
             zero_out();
             if returning().is_some_and(|r| r).not() {
                 w_from(r_to());
-            } 
+            }
             w_to(None);
             reset_returning();
-
         };
     };
 
@@ -329,14 +347,15 @@ pub fn AddTravel(write_to: WriteSignal<Trips>, from: RwSignal<Option<String>>, t
 
 #[component]
 fn DestinationDataList() -> impl IntoView {
-    let welcome_package = destinations()
-        .into_iter()
-        .map(|x| view! { <option value=x></option> })
-        .collect_view();
+    let (r_custom, _, _) = use_local_storage::<CustomTrips, JsonCodec>("my-custom-trips");
+    let options = Signal::derive(move || {
+        r_custom.with(|c| c.trips.keys().cloned().chain(destinations()).collect_vec())
+    });
     view! {
         <datalist id="destination-choices">
-
-            {welcome_package}
+            <For each=options key=move |k| k.clone() let:name>
+                <option value=name></option>
+            </For>
 
         </datalist>
     }
