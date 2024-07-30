@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Not};
 
 use chrono::Local;
 
@@ -39,35 +39,57 @@ impl CustomTrips {
 #[component]
 pub fn Home() -> impl IntoView {
     let (r_trips, w_trips, _) = use_local_storage::<Trips, JsonCodec>("my-trips");
+    let from = create_rw_signal(None);
+    let to = create_rw_signal(None);
+    let returning  = create_rw_signal(None);
 
     view! {
         <div class="min-h-svh py-12">
             <div class="w-11/12 flex justify-center gap-20">
-                <QuickChoice trips=r_trips/>
+                <QuickChoice trips=r_trips from to returning/>
                 <div class="form-control w-full max-w-sm outline my-6 p-6 outline-1 outline-primary rounded-xl h-fit">
                     <DestinationDataList/>
-                    <AddTravel write_to=w_trips/>
+                    <AddTravel write_to=w_trips from to returning />
                 </div>
             </div>
         </div>
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+struct NavTrip {
+    from: Option<String>,
+    to: Option<String>,
+    returning: Option<bool>,
+}
+
 #[component]
-pub fn QuickChoice(trips: Signal<Trips>) -> impl IntoView {
+pub fn QuickChoice(trips: Signal<Trips>, from: RwSignal<Option<String>>, to: RwSignal<Option<String>>, returning: RwSignal<Option<bool>>) -> impl IntoView {
     let no_favs = trips.with_untracked(|tr| tr.favorites().is_empty());
     let no_recents = trips.with_untracked(|tr| tr.recent(5).is_empty());
+    let (_, w_from) = from.split();
+    let (_, w_to) = to.split();
+    let (_, w_returning) = returning.split();
+
+    let on_submit = Callback::<SubmitEvent>::from(move |ev: SubmitEvent| {
+        ev.prevent_default();
+        let NavTrip { from, to, returning } = NavTrip::from_event(&ev).unwrap_or_default();
+        w_from(from);
+        w_to(to);
+        w_returning(returning)
+ } );
+
     let favs = trips
         .with_untracked(|tr| tr.favorites())
         .into_iter()
         .map(|f| {
-            view! { <QuickChoiceRow trip=f/> }
+            view! { <QuickChoiceRow trip=f on_submit /> }
         })
         .collect_view();
     let recents = trips
         .with_untracked(|tr| tr.recent(5))
         .into_iter()
-        .map(|f| view! { <QuickChoiceRow trip=f/> })
+        .map(|f| view! { <QuickChoiceRow trip=f on_submit /> })
         .collect_view();
     view! {
         <div class="flex flex-col xl:flex-row items-center xl:justify-around gap-12 justify-center" class:hidden=no_favs>
@@ -84,7 +106,7 @@ pub fn QuickChoice(trips: Signal<Trips>) -> impl IntoView {
 }
 
 #[component]
-pub fn QuickChoiceRow(trip: Trip) -> impl IntoView {
+pub fn QuickChoiceRow(trip: Trip, on_submit: Callback<SubmitEvent>) -> impl IntoView {
     let icon = if trip.returning {
         icondata::BsArrowLeftRight
     } else {
@@ -100,7 +122,7 @@ pub fn QuickChoiceRow(trip: Trip) -> impl IntoView {
                     </p>
                 </div>
             </div>
-            <Form action="" method="GET" class="hidden shrink-0 sm:flex sm:flex-col sm:items-end">
+            <Form action="" on:submit=on_submit method="GET" class="hidden shrink-0 sm:flex sm:flex-col sm:items-end">
                 <input type="hidden" name="to" value=trip.to/>
                 <input type="hidden" name="from" value=trip.from/>
                 <input type="hidden" name="returning" value=trip.returning.to_string()/>
@@ -113,11 +135,11 @@ pub fn QuickChoiceRow(trip: Trip) -> impl IntoView {
 }
 
 #[component]
-pub fn AddTravel(write_to: WriteSignal<Trips>) -> impl IntoView {
+pub fn AddTravel(write_to: WriteSignal<Trips>, from: RwSignal<Option<String>>, to: RwSignal<Option<String>>, returning: RwSignal<Option<bool>>) -> impl IntoView {
     let (r_custom, w_custom, _) = use_local_storage::<CustomTrips, JsonCodec>("my-custom-trips");
-    let (r_from, w_from) = create_query_signal::<String>("from");
-    let (r_to, w_to) = create_query_signal::<String>("to");
-    let (r_returning, w_returning) = create_query_signal::<bool>("returning");
+    let (r_from, w_from) = from.split();
+    let (r_to, w_to) = to.split();
+    let (r_returning, w_returning) = returning.split();
     let (r_distance, w_distance) = create_signal(0.);
     let (r_time, w_time) = create_signal(0);
     let today = Local::now().date_naive().to_string();
@@ -174,8 +196,12 @@ pub fn AddTravel(write_to: WriteSignal<Trips>) -> impl IntoView {
                 tr.add(t);
             });
             zero_out();
+            if returning().is_some_and(|r| r).not() {
+                w_from(r_to());
+            } 
+            w_to(None);
             reset_returning();
-            w_to(r_from.get_untracked());
+
         };
     };
 
