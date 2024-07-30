@@ -68,8 +68,8 @@ pub fn QuickChoice(
     to: RwSignal<Option<String>>,
     returning: RwSignal<Option<bool>>,
 ) -> impl IntoView {
-    let no_favs = trips.with_untracked(|tr| tr.favorites().is_empty());
-    let no_recents = trips.with_untracked(|tr| tr.recent(5).is_empty());
+    let no_favs = Signal::derive(move || trips.with(|tr| tr.favorites().is_empty()));
+    let no_recents = Signal::derive(move || trips.with(|tr| tr.recent(5).is_empty()));
     let (_, w_from) = from.split();
     let (_, w_to) = to.split();
     let (_, w_returning) = returning.split();
@@ -86,18 +86,8 @@ pub fn QuickChoice(
         w_returning(returning)
     });
 
-    let favs = trips
-        .with_untracked(|tr| tr.favorites())
-        .into_iter()
-        .map(|f| {
-            view! { <QuickChoiceRow trip=f on_submit/> }
-        })
-        .collect_view();
-    let recents = trips
-        .with_untracked(|tr| tr.recent(5))
-        .into_iter()
-        .map(|f| view! { <QuickChoiceRow trip=f on_submit/> })
-        .collect_view();
+    let favs = Signal::derive(move || trips.with(|tr| tr.favorites()));
+    let recents = Signal::derive(move || trips.with(|tr| tr.recent(5)));
     view! {
         <div
             class="flex flex-col xl:flex-row items-center xl:justify-around gap-12 justify-center"
@@ -105,11 +95,19 @@ pub fn QuickChoice(
         >
             <div class="flex flex-col gap-3">
                 <h2 class="text-2xl text-center">Favoriter</h2>
-                <div class="flex flex-col divide-y-2 ">{favs}</div>
+                <div class="flex flex-col divide-y-2 ">
+                    <For each=favs key=move |t| t.uuid let:trip>
+                        <QuickChoiceRow trip on_submit/>
+                    </For>
+                </div>
             </div>
             <div class="flex flex-col gap-3" class:hidden=no_recents>
                 <h2 class="text-2xl text-center">Senaste</h2>
-                <div class="flex flex-col divide-y-2 ">{recents}</div>
+                <div class="flex flex-col divide-y-2 ">
+                    <For each=recents key=move |t| t.uuid let:trip>
+                        <QuickChoiceRow trip on_submit/>
+                    </For>
+                </div>
             </div>
         </div>
     }
