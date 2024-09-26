@@ -127,13 +127,13 @@ pub fn App() -> impl IntoView {
 
         <Router>
             <Nav/>
-            <Routes>
-                <Route path="/abasku" view=Home/>
-                <Route path="/abasku/checkpoint" view=Checkpoints>
+            <Routes base=String::from("/abasku")>
+                <Route path="" view=Home/>
+                <Route path="checkpoint" view=Checkpoints>
                     <Route path="" view=CheckpointSummary/>
                     <Route path="report/:year/:month" view=Report/>
                 </Route>
-                <Route path="/*" view=NotFound/>
+                <Route path="/*" view=|| view!{<Redirect path="/abasku" />}/>
             </Routes>
         </Router>
     }
